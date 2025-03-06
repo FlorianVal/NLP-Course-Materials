@@ -17,6 +17,7 @@
 *.pdf
 *.pyg
 *.fdb_latexmk
+*.key
 
 # Python files
 __pycache__/
@@ -45,6 +46,9 @@ venv/
 
 # Generated images folder
 images/generated/
+
+# IDE specific files
+.vscode/
 
 # OS specific files
 .DS_Store

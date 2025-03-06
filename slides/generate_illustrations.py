@@ -1,14 +1,14 @@
 import os
 import matplotlib
-matplotlib.use('Agg')  # Use Agg backend for better compatibility
 import matplotlib.pyplot as plt
 import networkx as nx
 from tqdm import tqdm
 import numpy as np
 
+matplotlib.use('Agg')  # Use Agg backend for better compatibility
 
 class NLPIllustrator:
-    def __init__(self, save_path="images/generated", base_path="Lesson_1/images"):
+    def __init__(self, save_path="images/generated", base_path="images"):
         self.save_path = save_path
         self.base_path = base_path
         self._setup()
@@ -188,6 +188,9 @@ class NLPIllustrator:
         plt.savefig(f"{self.save_path}/bpe_algorithm.png", dpi=300, bbox_inches="tight")
         plt.close()
         
+        # Create an illustration showing tokenizer-model separation after BPE
+        self.illustrate_tokenizer_model_separation()
+        
         # Create a visualization of vocabulary size comparison
         self.illustrate_vocab_size_comparison()
     
@@ -220,6 +223,83 @@ class NLPIllustrator:
         
         plt.tight_layout()
         plt.savefig(f"{self.save_path}/vocab_size_comparison.png", dpi=300, bbox_inches="tight")
+        plt.close()
+        
+    def illustrate_tokenizer_model_separation(self):
+        """Create an illustration showing how tokenizers are separate from models."""
+        plt.figure(figsize=(14, 4))
+        
+        # Define elements
+        elements = {
+            'raw_text': {
+                'pos': (0.15, 0.5),
+                'width': 0.2,
+                'height': 0.3,
+                'label': 'Raw Text',
+                'color': '#f7dc6f',  # Yellow
+                'text': "L'intelligence artificielle\ntransforme notre monde."
+            },
+            'tokenizer': {
+                'pos': (0.4, 0.5),
+                'width': 0.2,
+                'height': 0.4,
+                'label': 'Tokenizer',
+                'color': '#3498db',  # Blue
+                'text': "1. Normalisation\n2. Segmentation\n3. Encodage en IDs"
+            },
+            'tokens': {
+                'pos': (0.65, 0.5),
+                'width': 0.2,
+                'height': 0.3,
+                'label': 'Token Sequence',
+                'color': '#f7dc6f',  # Yellow (same as raw text)
+                'text': "[101, 345, 456, 789,\n567, 234, 876, 102]"
+            },
+            'llm': {
+                'pos': (0.9, 0.5),
+                'width': 0.15,
+                'height': 0.3,
+                'label': 'LLM',
+                'color': '#3498db',  # Blue 
+                'text': "Large Language Model"
+            }
+        }
+        
+        # Draw elements
+        for key, element in elements.items():
+            x, y = element['pos']
+            w, h = element['width'], element['height']
+            color = element['color']
+            
+            # Draw rectangle
+            rect = plt.Rectangle((x - w/2, y - h/2), w, h, facecolor=color, alpha=0.7, edgecolor='black', linewidth=1)
+            plt.gca().add_patch(rect)
+            
+            # Add label
+            plt.text(x, y, element['label'], ha='center', va='center', fontweight='bold')
+            
+        # Draw bidirectional arrows for flow
+        arrow_props = dict(arrowstyle='<->', linewidth=2, color='gray')
+        
+        # Text to tokenizer
+        plt.annotate('', 
+                     xy=(elements['tokenizer']['pos'][0] - elements['tokenizer']['width']/2, elements['tokenizer']['pos'][1]),
+                     xytext=(elements['raw_text']['pos'][0] + elements['raw_text']['width']/2, elements['raw_text']['pos'][1]),
+                     arrowprops=arrow_props)
+        
+        # Tokenizer to tokens
+        plt.annotate('', 
+                     xy=(elements['tokens']['pos'][0] - elements['tokens']['width']/2, elements['tokens']['pos'][1]),
+                     xytext=(elements['tokenizer']['pos'][0] + elements['tokenizer']['width']/2, elements['tokenizer']['pos'][1]),
+                     arrowprops=arrow_props)
+        
+        # Set axis limits and turn off axis
+        plt.xlim(0, 1)
+        plt.ylim(0, 1)
+        plt.axis('off')
+        
+        plt.tight_layout()
+        plt.savefig(f"{self.save_path}/tokenizer_model_separation.png", dpi=300, bbox_inches="tight")
         plt.close()
         
     def illustrate_sentiment_analysis(self):
@@ -382,13 +462,268 @@ class NLPIllustrator:
         plt.savefig(f"{self.save_path}/llm_future.png", dpi=300, bbox_inches="tight")
         plt.close()
     
+    def illustrate_bag_of_words(self):
+        """Create an illustration showing the Bag of Words representation concept."""
+        plt.figure(figsize=(10, 8))
+        
+        # Define 3 simple example sentences
+        sentences = [
+            "Le chat mange du poisson",
+            "Le chien court dans le jardin",
+            "Le chat dort dans son panier"
+        ]
+        
+        # Create a vocabulary (unique words from all sentences)
+        all_words = []
+        for sentence in sentences:
+            words = sentence.lower().split()
+            all_words.extend(words)
+        vocabulary = sorted(list(set(all_words)))
+        
+        # Create BOW vectors for each sentence
+        bow_vectors = []
+        for sentence in sentences:
+            words = sentence.lower().split()
+            vector = [words.count(word) for word in vocabulary]
+            bow_vectors.append(vector)
+        
+        # Create a visual representation
+        plt.subplot(1, 1, 1)
+        
+        # Plot vocabulary at the top
+        plt.text(0.5, 0.95, "Vocabulaire commun:", fontsize=12, fontweight='bold', ha='center')
+        vocab_text = "[ " + ", ".join(vocabulary) + " ]"
+        plt.text(0.5, 0.9, vocab_text, fontsize=10, ha='center', 
+                 bbox=dict(boxstyle="round,pad=0.5", facecolor='#f7dc6f', alpha=0.7))
+        
+        # Plot sentences and their BOW vectors
+        for i, (sentence, bow) in enumerate(zip(sentences, bow_vectors)):
+            y_pos = 0.75 - i*0.25
+            
+            # Draw the sentence box - positioned to the left of center
+            plt.text(0.3, y_pos, f'"{sentence}"', 
+                     fontsize=12, ha='right', va='center',
+                     bbox=dict(boxstyle="round,pad=0.5", facecolor='#3498db', alpha=0.7))
+            
+            # Draw arrow in the center
+            plt.annotate('', xy=(0.6, y_pos), xytext=(0.4, y_pos),
+                         arrowprops=dict(arrowstyle='->', linewidth=1.5, color='black'))
+            
+            # Vector representation - positioned to the right of center
+            vec_text = "[" + ", ".join(map(str, bow)) + "]"
+            plt.text(0.7, y_pos, vec_text, 
+                     fontsize=10, ha='left', va='center',
+                     bbox=dict(boxstyle="round,pad=0.3", facecolor='#2ecc71', alpha=0.7))
+        
+        plt.title("Représentation Bag of Words de textes")
+        plt.axis('off')
+        
+        plt.tight_layout()
+        plt.savefig(f"{self.save_path}/bag_of_words.png", dpi=300, bbox_inches="tight")
+        plt.close()
+    
+    def illustrate_tfidf(self):
+        """Create an illustration showing the TF-IDF concept and its application."""
+        plt.figure(figsize=(14, 10))
+        
+        # Example documents
+        documents = [
+            "Le chat noir dort sur le canapé",
+            "Le chien joue avec la balle dans le jardin",
+            "Le chat et le chien courent dans le jardin"
+        ]
+        
+        # Define some key words and their TF-IDF scores (simplified)
+        words = ['chat', 'chien', 'noir', 'dort', 'canapé', 'joue', 'balle', 'jardin', 'courent']
+        
+        # Simplified TF values (term frequency)
+        tf_values = [
+            [1/7, 0, 1/7, 1/7, 1/7, 0, 0, 0, 0],  # Document 1
+            [0, 1/8, 0, 0, 0, 1/8, 1/8, 1/8, 0],  # Document 2
+            [1/8, 1/8, 0, 0, 0, 0, 0, 1/8, 1/8]   # Document 3
+        ]
+        
+        # Simplified IDF values (log(N/df) where N=3 documents)
+        idf_values = []
+        for word in words:
+            # Count in how many documents the word appears
+            doc_count = sum(1 for doc in documents if word in doc.lower())
+            idf = np.log(3 / doc_count) if doc_count > 0 else 0
+            idf_values.append(round(idf, 2))
+        
+        # Calculate TF-IDF values
+        tfidf_values = []
+        for tf_doc in tf_values:
+            tfidf_doc = [round(tf * idf, 3) for tf, idf in zip(tf_doc, idf_values)]
+            tfidf_values.append(tfidf_doc)
+        
+        # TOP: Visualization of TF-IDF calculation process
+        plt.subplot(2, 1, 1)
+        
+        # Create a table to show TF-IDF calculation
+        table_data = []
+        for i, word in enumerate(words):
+            row = [word]
+            # Add TF values for each document
+            for j in range(3):
+                row.append(f"{tf_values[j][i]:.3f}")
+            # Add IDF value
+            row.append(f"{idf_values[i]:.2f}")
+            # Add TF-IDF for each document
+            for j in range(3):
+                row.append(f"{tfidf_values[j][i]:.3f}")
+            table_data.append(row)
+        
+        # Column labels
+        col_labels = ['Mot', 'TF Doc1', 'TF Doc2', 'TF Doc3', 'IDF', 
+                      'TF-IDF Doc1', 'TF-IDF Doc2', 'TF-IDF Doc3']
+        
+        # Create the table
+        table = plt.table(
+            cellText=table_data,
+            colLabels=col_labels,
+            loc='center',
+            cellLoc='center',
+            colWidths=[0.1, 0.08, 0.08, 0.08, 0.08, 0.1, 0.1, 0.1]
+        )
+        
+        # Style the table
+        table.auto_set_font_size(False)
+        table.set_fontsize(9)
+        table.scale(1, 1.5)
+        
+        plt.title('Calcul des valeurs TF-IDF pour un corpus d\'exemple')
+        plt.axis('off')
+        
+        # BOTTOM: Document similarity visualization using TF-IDF vectors
+        plt.subplot(2, 1, 2)
+        
+        # Create a graph representing document similarity
+        G = nx.Graph()
+        
+        # Add document nodes
+        nodes = [f"Document {i+1}" for i in range(3)]
+        for node in nodes:
+            G.add_node(node)
+        
+        # Calculate cosine similarity between documents (simplified)
+        def cosine_similarity(v1, v2):
+            dot_product = sum(a*b for a, b in zip(v1, v2))
+            norm_v1 = sum(a*a for a in v1) ** 0.5
+            norm_v2 = sum(b*b for b in v2) ** 0.5
+            return round(dot_product / (norm_v1 * norm_v2), 2) if norm_v1 * norm_v2 > 0 else 0
+        
+        # Add edges with similarity weights
+        similarities = [
+            cosine_similarity(tfidf_values[0], tfidf_values[1]),  # Doc1 - Doc2
+            cosine_similarity(tfidf_values[0], tfidf_values[2]),  # Doc1 - Doc3
+            cosine_similarity(tfidf_values[1], tfidf_values[2]),  # Doc2 - Doc3
+        ]
+        
+        G.add_edge(nodes[0], nodes[1], weight=similarities[0])
+        G.add_edge(nodes[0], nodes[2], weight=similarities[1])
+        G.add_edge(nodes[1], nodes[2], weight=similarities[2])
+        
+        # Set positions of nodes
+        pos = nx.spring_layout(G, seed=42)
+        
+        # Draw the graph
+        nx.draw_networkx_nodes(G, pos, node_size=2000, node_color='lightblue', alpha=0.8)
+        nx.draw_networkx_labels(G, pos, font_size=10, font_weight="bold")
+        
+        # Draw edges with width proportional to similarity
+        for (u, v, d) in G.edges(data=True):
+            width = d['weight'] * 5
+            if width > 0:
+                nx.draw_networkx_edges(G, pos, edgelist=[(u, v)], width=width, alpha=0.7)
+        
+        # Draw edge labels (similarities)
+        edge_labels = {(u, v): f"{d['weight']}" for u, v, d in G.edges(data=True)}
+        nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=9)
+        
+        # Add document content as text boxes
+        for i, node in enumerate(nodes):
+            text_box = f'"{documents[i]}"'
+            x, y = pos[node]
+            plt.text(x, y-0.15, text_box, ha='center', va='center', fontsize=8,
+                    bbox=dict(boxstyle="round,pad=0.3", facecolor='white', alpha=0.7))
+        
+        plt.title('Similarité entre documents basée sur TF-IDF')
+        plt.axis('off')
+        
+        plt.tight_layout()
+        plt.savefig(f"{self.save_path}/tfidf.png", dpi=300, bbox_inches="tight")
+        plt.close()
+    
+    def illustrate_ngram_model(self):
+        """Create illustrations showing n-gram models and text generation."""
+        # Create figure for n-gram visualization
+        plt.figure(figsize=(10, 6))
+        
+        # Example text for n-gram demonstration
+        text = "Le chat noir dort sur le canapé"
+        
+        # Visualize different n-grams (unigram, bigram, trigram)
+        plt.subplot(3, 1, 1)
+        words = text.split()
+        x_pos = np.arange(len(words))
+        plt.bar(x_pos, [1] * len(words), color='skyblue')
+        plt.xticks(x_pos, words, rotation=0)
+        plt.ylim(0, 1.5)
+        plt.title('Unigrammes (n=1)')
+        plt.tick_params(axis='both', which='major', labelsize=8)
+        
+        plt.subplot(3, 1, 2)
+        bigrams = [" ".join(words[i:i+2]) for i in range(len(words)-1)]
+        x_pos = np.arange(len(bigrams))
+        plt.bar(x_pos, [1] * len(bigrams), color='lightgreen')
+        plt.xticks(x_pos, bigrams, rotation=40, ha='right')
+        plt.ylim(0, 1.5)
+        plt.title('Bigrammes (n=2)')
+        plt.tick_params(axis='both', which='major', labelsize=8)
+        
+        plt.subplot(3, 1, 3)
+        trigrams = [" ".join(words[i:i+3]) for i in range(len(words)-2)]
+        x_pos = np.arange(len(trigrams))
+        plt.bar(x_pos, [1] * len(trigrams), color='salmon')
+        plt.xticks(x_pos, trigrams, rotation=40, ha='right')
+        plt.ylim(0, 1.5)
+        plt.title('Trigrammes (n=3)')
+        plt.tick_params(axis='both', which='major', labelsize=8)
+        
+        plt.tight_layout(pad=1.0)
+        plt.savefig(os.path.join(self.save_path, 'ngram_model.png'), dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        # Create figure for n-gram text generation
+        plt.figure(figsize=(10, 6))
+        
+        # Sample probabilities
+        context = "Le chat"
+        next_words = ["noir", "blanc", "dort", "joue", "mange"]
+        probs = [0.4, 0.2, 0.2, 0.15, 0.05]
+        
+        # Create bar chart of probabilities
+        plt.bar(next_words, probs, color='lightblue')
+        plt.ylabel('Probabilité')
+        plt.xlabel('Mot suivant possible')
+        plt.title(f'Probabilités conditionnelles pour le contexte: "{context}"')
+        
+        # Add the formula above the chart
+        formula = r'$P(\text{mot suivant} | \text{Le chat}) = \frac{\text{count(Le chat mot suivant)}}{\text{count(Le chat)}}$'
+        plt.figtext(0.5, 0.85, formula, ha='center', fontsize=12, 
+                  bbox=dict(facecolor='white', alpha=0.8))
+        
+        plt.tight_layout()
+        plt.savefig(os.path.join(self.save_path, 'ngram_generation.png'), dpi=300, bbox_inches='tight')
+        plt.close()
+
     def generate_all(self):
         """Call all defined illustration functions."""
-        illustration_methods = [method for method in dir(self) if method.startswith("illustrate_")]
-        for method in tqdm(illustration_methods, desc="Generating illustrations",
-                           bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}{postfix}]"):
-            print(f"Generating: {method}")
-            getattr(self, method)()
+        methods = [method for method in dir(self) if method.startswith('illustrate_')]
+        for func_name in tqdm(methods, desc="Generating illustrations"):
+            print(f"Generating: {func_name}")
+            getattr(self, func_name)()
 
 
 if __name__ == "__main__":
