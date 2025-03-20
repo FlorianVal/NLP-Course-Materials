@@ -8,9 +8,12 @@
 \usepackage{graphicx}
 \usepackage{amsmath}
 \usepackage{xcolor}
+\definecolor{lightblue}{rgb}{0.68,0.85,0.9}
+\definecolor{lightgreen}{rgb}{0.56,0.93,0.56}
 \usepackage{listings}
 \usepackage{hyperref}
 \usepackage{tikz}
+\usetikzlibrary{matrix,calc,math}
 \usepackage{booktabs}
 
 % Thème Beamer
@@ -235,6 +238,33 @@
     \end{columns}
 \end{frame}
 
+\begin{frame}{Positional Encoding: Intégrer l'information de position}
+    \begin{columns}
+        \begin{column}{0.5\textwidth}
+            \begin{center}
+                \includegraphics[width=0.9\textwidth]{images/position_matrix.png}
+            \end{center}
+        \end{column}
+        \begin{column}{0.5\textwidth}
+            \begin{itemize}
+                \item Les Transformers n'ont pas de notion intrinsèque de \textbf{position}
+                \item Nécessité d'ajouter cette information explicitement
+                \item Encodage sinusoïdal (Vaswani et al.):
+                \begin{align*}
+                    PE_{(pos,2i)} &= \sin(pos/10000^{2i/d}) \\
+                    PE_{(pos,2i+1)} &= \cos(pos/10000^{2i/d})
+                \end{align*}
+                \item \textbf{Propriétés}:
+                \begin{itemize}
+                    \item Fréquences différentes pour chaque dimension
+                    \item Valeurs bornées entre $[-1,1]$
+                    \item Permet de généraliser à des positions non vues
+                \end{itemize}
+            \end{itemize}
+        \end{column}
+    \end{columns}
+\end{frame}
+
 % Slide 12: Layer Normalization
 \begin{frame}{Layer Normalization: Stabiliser l'apprentissage}
 
@@ -261,7 +291,7 @@
             % Inputs
             \foreach \i in {1,...,4}
             {
-                \node (Input-\i) at (0,-\i) {$x_\i$};
+                \node (Input-\i) at (0,-\i*1.5+0.5) {$x_\i$};
             }
 
             % Hidden Layer - Q
@@ -274,7 +304,7 @@
             % Inputs
             \foreach \i in {1,...,4}
             {
-                \node (Input2-\i) at (6,-\i) {$x_\i$};
+                \node (Input2-\i) at (6,-\i*1.5+0.5) {$x_\i$};
             }
             % Hidden Layer - K
             \foreach \i in {1,...,3}
@@ -286,7 +316,7 @@
             % Inputs
             \foreach \i in {1,...,4}
             {
-                \node (Input3-\i) at (12,-\i) {$x_\i$};
+                \node (Input3-\i) at (12,-\i*1.5+0.5) {$x_\i$};
             }
             % Hidden Layer - V
             \foreach \i in {1,...,3}
@@ -548,6 +578,412 @@
         \item \textbf{GELU}: Fonction d'activation non-linéaire plus performante que ReLU
         \item \textbf{Projection}: Retour à la dimension d'origine
         \item \textbf{Dropout}: Régularisation pour éviter le surapprentissage
+    \end{itemize}
+\end{frame}
+
+% Slide 20: Tête de classification
+\begin{frame}{La tête de classification: Structure}
+    \begin{columns}
+        \begin{column}{0.5\textwidth}
+            \begin{center}
+                \includegraphics[width=0.7\textwidth]{images/gpt2_classif.png}
+            \end{center}
+        \end{column}
+        \begin{column}{0.5\textwidth}
+            \begin{itemize}
+                \item \textbf{Dernière couche} du modèle LLM
+                \item Transforme les représentations contextuelles en \textbf{probabilités} sur le vocabulaire
+                \item Structure simple: \textbf{couche linéaire} suivie d'un \textbf{softmax}
+                \item La dimension de sortie correspond à la \textbf{taille du vocabulaire} (50K-100K tokens)
+                \item Dans GPT, la matrice de poids est souvent \textbf{partagée} avec la matrice d'embedding (weight tying)
+            \end{itemize}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{La tête de classification: Prédiction du token suivant}
+    \begin{itemize}
+        \item \textbf{Adaptable} selon la tâche:
+        \begin{itemize}
+            \item Génération de texte: prédiction du token suivant
+            \item Classification: prédiction d'une classe
+            \item Question-réponse: extraction de réponses
+        \end{itemize}
+    \end{itemize}
+    \vspace{0.5cm}
+    \begin{center}
+        \textbf{Fonction Softmax:} Conversion des logits en probabilités
+        \begin{align*}
+            P(token_i | contexte) = \text{softmax}(z_i) = \frac{e^{z_i}}{\sum_{j=1}^{|V|} e^{z_j}}
+        \end{align*}
+        où $z_i = (Wx + b)_i$ sont les logits pour le token $i$ et $|V|$ est la taille du vocabulaire
+    \end{center}
+\end{frame}
+
+% Slide 21: Format du vecteur de sortie et masquage causal
+\begin{frame}{Format de sortie et masquage causal}
+    \begin{columns}
+        \begin{column}{0.55\textwidth}
+            \begin{center}
+                \begin{tikzpicture}[scale=0.75]
+                    % Input tokens
+                    \node[align=center] at (0,5.2) {Entrée};
+                    \foreach \i/\word in {0/Le, 1/chat, 2/noir, 3/dort} {
+                        \begin{scope}
+                            \foreach \j in {0,...,\i} {
+                                \pgfmathsetmacro{\wordindex}{min(\j,3)}
+                                \pgfmathtruncatemacro{\wordindex}{\wordindex}
+                                \pgfmathsetmacro{\wordtext}{{"Le","chat","noir","dort"}[\wordindex]}
+                                \draw[fill=lightblue!40, draw=gray!60, rounded corners=2pt] (\j*2,4-\i*1) rectangle ++(1.8,0.7) node[pos=.5] {\wordtext};
+                            }
+                        \end{scope}
+                    }
+                    
+                    % Output predictions with shifted indices
+                    \node[align=center] at (6,5.2) {Sortie (prédictions)};
+                    \foreach \i/\word in {0/chat, 1/noir, 2/dort, 3/sur} {
+                        \draw[fill=lightgreen!40, draw=gray!60, rounded corners=2pt] (3+\i*2,4-\i*1) rectangle ++(1.8,0.7) node[pos=.5] {\word};
+                    }
+                    
+                    % Attention mask
+                    \node[align=center] at (3.5,0) {Masque d'attention};
+                    
+                    % Attention mask grid - positioned below inputs/outputs
+                    \draw[fill=blue!20, draw=gray] (2,-1) rectangle ++(0.7,0.7) node[pos=.5] {1};
+                    \draw[fill=red!20, draw=gray] (2.7,-1) rectangle ++(0.7,0.7) node[pos=.5] {0};
+                    \draw[fill=red!20, draw=gray] (3.4,-1) rectangle ++(0.7,0.7) node[pos=.5] {0};
+                    \draw[fill=red!20, draw=gray] (4.1,-1) rectangle ++(0.7,0.7) node[pos=.5] {0};
+                    
+                    \draw[fill=blue!20, draw=gray] (2,-1.7) rectangle ++(0.7,0.7) node[pos=.5] {1};
+                    \draw[fill=blue!20, draw=gray] (2.7,-1.7) rectangle ++(0.7,0.7) node[pos=.5] {1};
+                    \draw[fill=red!20, draw=gray] (3.4,-1.7) rectangle ++(0.7,0.7) node[pos=.5] {0};
+                    \draw[fill=red!20, draw=gray] (4.1,-1.7) rectangle ++(0.7,0.7) node[pos=.5] {0};
+                    
+                    \draw[fill=blue!20, draw=gray] (2,-2.4) rectangle ++(0.7,0.7) node[pos=.5] {1};
+                    \draw[fill=blue!20, draw=gray] (2.7,-2.4) rectangle ++(0.7,0.7) node[pos=.5] {1};
+                    \draw[fill=blue!20, draw=gray] (3.4,-2.4) rectangle ++(0.7,0.7) node[pos=.5] {1};
+                    \draw[fill=red!20, draw=gray] (4.1,-2.4) rectangle ++(0.7,0.7) node[pos=.5] {0};
+                    
+                    \draw[fill=blue!20, draw=gray] (2,-3.1) rectangle ++(0.7,0.7) node[pos=.5] {1};
+                    \draw[fill=blue!20, draw=gray] (2.7,-3.1) rectangle ++(0.7,0.7) node[pos=.5] {1};
+                    \draw[fill=blue!20, draw=gray] (3.4,-3.1) rectangle ++(0.7,0.7) node[pos=.5] {1};
+                    \draw[fill=blue!20, draw=gray] (4.1,-3.1) rectangle ++(0.7,0.7) node[pos=.5] {1};
+                    
+                    % Add arrows to show prediction alignment
+                    \foreach \i in {0,...,3} {
+                        \draw[->, thick, dashed, blue!60] (1.9+\i*2,4-\i*1+0.35) to[out=0,in=180] (3+\i*2,4-\i*1+0.35);
+                    }
+                \end{tikzpicture}
+            \end{center}
+        \end{column}
+        \begin{column}{0.45\textwidth}
+            \begin{itemize}
+                \item Le modèle génère des prédictions pour \textbf{tous les tokens} simultanément
+                \item Pour chaque position, on prédit le token \textbf{suivant}
+                \item Un \textbf{masque causal} empêche chaque token de "voir le futur":
+                \begin{itemize}
+                    \item Le premier token ne voit que lui-même
+                    \item Le deuxième voit le premier et lui-même
+                    \item Etc.
+                \end{itemize}
+                \item La sortie est de la \textbf{même dimension} que l'entrée mais \textbf{décalée} d'une position
+            \end{itemize}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+% Slide 22: Introduction aux stratégies de génération
+\begin{frame}{Stratégies de génération: Du vecteur de probabilités au texte}
+    \begin{center}
+        \Large{\textbf{Comment générer du texte à partir du vecteur de probabilités?}}
+        
+        \vspace{0.2cm}
+        
+        \begin{tikzpicture}[scale=0.9]
+            % Input vector
+            \draw[fill=lightblue!40, draw=gray!60, rounded corners=2pt] (1,0) rectangle (11,1) node[pos=.5] {Vecteur de probabilités sur le vocabulaire};
+            
+            % Arrow down
+            \draw[->, thick] (6,0) -- (6,-1);
+            
+            % Decoding strategies
+            \node[align=center] at (1,-1.5) {\textbf{Stratégies déterministes}};
+            \node[align=center] at (11,-1.5) {\textbf{Stratégies stochastiques}};
+            
+            % Methods
+            \node[align=center, fill=lightblue!20, draw=gray!60, rounded corners=2pt, text width=3cm] at (0,-2.5) {Greedy Search};
+            \node[align=center, fill=lightblue!20, draw=gray!60, rounded corners=2pt, text width=3cm] at (2,-3.5) {Beam Search};
+            
+            \node[align=center, fill=lightgreen!20, draw=gray!60, rounded corners=2pt, text width=3cm] at (7,-2.5) {Sampling};
+            \node[align=center, fill=lightgreen!20, draw=gray!60, rounded corners=2pt, text width=3cm] at (12.4,-3.5) {Top-K sampling};
+            \node[align=center, fill=lightgreen!20, draw=gray!60, rounded corners=2pt, text width=3cm] at (8,-4.5) {Top-P sampling (Nucleus)};
+        \end{tikzpicture}
+    \end{center}
+\end{frame}
+
+% Slide 23: Greedy Search
+\begin{frame}{Greedy Search: La méthode la plus simple}
+    \begin{columns}
+        \begin{column}{0.5\textwidth}
+            \begin{center}
+                \includegraphics[width=\textwidth]{images/beam.png}
+            \end{center}
+        \end{column}
+        \begin{column}{0.5\textwidth}
+            \begin{align*}
+                w_t = \underset{w}{\text{argmax}} \ p(w|w_{1:t-1})
+            \end{align*}
+            \begin{itemize}
+                \item À chaque étape, choisir le token le \textbf{plus probable}
+                \item Méthode \textbf{déterministe}: pour une entrée donnée, toujours la même sortie
+                \item \textbf{Inconvénients}:
+                \begin{itemize}
+                    \item Pas de diversité
+                    \item Tendance à se répéter
+                    \item Peut ignorer des chemins globalement meilleurs
+                \end{itemize}
+            \end{itemize}
+        \end{column}
+    \end{columns}
+    \vspace{0.3cm}
+    \begin{center}
+        \footnotesize{Illustrations adaptées de Hugging Face: \url{https://huggingface.co/blog/how-to-generate}}
+    \end{center}
+\end{frame}
+
+% Slide 24: Beam Search
+\begin{frame}{Beam Search: Explorer plusieurs chemins en parallèle}
+    \begin{columns}
+        \begin{column}{0.5\textwidth}
+            \begin{center}
+                \includegraphics[width=\textwidth]{images/beam.png}
+            \end{center}
+        \end{column}
+        \begin{column}{0.5\textwidth}
+            \begin{itemize}
+                \item Maintient les \textbf{k meilleures hypothèses} à chaque étape (beam width)
+                \item Pour chacune, explore toutes les possibilités au pas suivant
+                \item Sélectionne les \textbf{k meilleures} parmi les \textbf{k × V} combinaisons
+                \item Score d'une séquence $Y = (y_1, ..., y_t)$:
+                \begin{align*}
+                    score(Y) = \sum_{i=1}^{t} \log p(y_i|y_{1:i-1})
+                \end{align*}
+                \item \textbf{Problèmes}:
+                \begin{itemize}
+                    \item Toujours déterministe
+                    \item Peu de diversité (les chemins convergent)
+                    \item Coûteux pour de grandes valeurs de k
+                \end{itemize}
+            \end{itemize}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+% Slide 25: Sampling
+\begin{frame}{Sampling: Introduire de l'aléatoire dans la génération}
+    \begin{columns}
+        \begin{column}{0.5\textwidth}
+            \begin{center}
+                \includegraphics[width=\textwidth]{images/sampling.png}
+            \end{center}
+        \end{column}
+        \begin{column}{0.5\textwidth}
+            \begin{align*}
+                w_t \sim p(w|w_{1:t-1})
+            \end{align*}
+            \begin{itemize}
+                \item Échantillonne un token selon la distribution de probabilité
+                \item \textbf{Avantages}:
+                \begin{itemize}
+                    \item Génère des textes \textbf{variés}
+                    \item Peut trouver des formulations créatives
+                    \item Plus naturel pour la conversation
+                \end{itemize}
+                \item \textbf{Inconvénients}:
+                \begin{itemize}
+                    \item Peut générer des tokens improbables
+                \end{itemize}
+            \end{itemize}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{Température: Contrôler l'aléatoire dans le sampling}
+    \begin{columns}
+        \begin{column}{0.6\textwidth}
+            \begin{align*}
+                p_T(w_i|w_{1:t-1}) = \frac{\exp(z_i/T)}{\sum_j \exp(z_j/T)}
+            \end{align*}
+            où $z_i$ sont les logits pour le token $i$
+            
+            \begin{center}
+                \begin{tikzpicture}[scale=0.8]
+                    % Axes
+                    \draw[->] (0,0) -- (6,0) node[right] {Tokens};
+                    \draw[->] (0,0) -- (0,4) node[above] {Probabilité};
+                    
+                    % T=0.5 (plus pointue)
+                    \draw[blue, thick] plot[smooth, tension=0.7] coordinates {(0,0.1) (1,0.2) (2,3) (3,0.5) (4,0.3) (5,0.1)};
+                    \node[blue] at (1.5,3.3) {$T=0.5$};
+                    
+                    % T=1 (normale)
+                    \draw[black, thick] plot[smooth, tension=0.7] coordinates {(0,0.3) (1,0.6) (2,2) (3,0.8) (4,0.5) (5,0.3)};
+                    \node[black] at (3,2.3) {$T=1$};
+                    
+                    % T=2 (plus plate)
+                    \draw[red, thick] plot[smooth, tension=0.7] coordinates {(0,0.5) (1,0.8) (2,1.2) (3,1) (4,0.7) (5,0.5)};
+                    \node[red] at (4.5,1.5) {$T=2$};
+                \end{tikzpicture}
+            \end{center}
+        \end{column}
+        \begin{column}{0.4\textwidth}
+            \begin{itemize}
+                \item Contrôle la "netteté" de la distribution
+                \item \textbf{Température basse} ($T < 1$):
+                \begin{itemize}
+                    \item Plus conservateur
+                    \item Accentue les différences
+                    \item Proche du greedy search
+                \end{itemize}
+                \item \textbf{Température haute} ($T > 1$):
+                \begin{itemize}
+                    \item Plus exploratoire
+                    \item Aplatit la distribution
+                    \item Génération plus diverse
+                \end{itemize}
+                \item $T = 0$: équivalent à greedy
+                \item Hyperparamètre crucial pour la qualité de génération
+            \end{itemize}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+% Slide 26: Top-K Sampling
+\begin{frame}{Top-K Sampling: Limiter l'espace des possibles}
+    \begin{center}
+        \includegraphics[width=0.5\textwidth]{images/top_k.png}
+    \end{center}
+    
+    \begin{enumerate}
+        \item Sélectionner les \textbf{K tokens} les plus probables
+        \item \textbf{Renormaliser} leurs probabilités:
+        \begin{align*}
+            p(w|w_{1:t-1}) = 
+            \begin{cases}
+            \frac{p(w|w_{1:t-1})}{\sum_{w' \in \text{top-K}} p(w'|w_{1:t-1})} & \text{si } w \in \text{top-K} \\
+            0 & \text{sinon}
+            \end{cases}
+        \end{align*}
+        \item Échantillonner à partir de cette distribution tronquée
+    \end{enumerate}
+\end{frame}
+
+\begin{frame}{Top-K Sampling: Avantages et inconvénients}
+    \begin{itemize}
+        \item \textbf{Avantages}:
+        \begin{itemize}
+            \item Évite les tokens improbables
+            \item Équilibre entre diversité et qualité
+        \end{itemize}
+        \item \textbf{Inconvénients}:
+        \begin{itemize}
+            \item Le choix de K est arbitraire
+            \item Inadapté si la distribution est plate ou très pointue
+        \end{itemize}
+    \end{itemize}
+\end{frame}
+
+% Slide 27: Top-P (Nucleus) Sampling
+\begin{frame}{Top-P Sampling: Adapter dynamiquement le nombre de choix}
+    \begin{center}
+        \includegraphics[width=0.5\textwidth]{images/top_p.png}
+    \end{center}
+    
+    \begin{enumerate}
+        \item Sélectionner le \textbf{plus petit ensemble de tokens} dont la probabilité cumulée dépasse \textbf{p} (nucleus):
+        \begin{align*}
+            V^{(p)} = \min_{V' \subset V} \left\{ V' \left| \sum_{w \in V'} p(w|w_{1:t-1}) \geq p \right. \right\}
+        \end{align*}
+        \item Renormaliser les probabilités sur cet ensemble
+        \item Échantillonner parmi ces tokens
+    \end{enumerate}
+\end{frame}
+
+\begin{frame}{Top-P Sampling: Avantages et inconvénients}
+    \begin{itemize}
+        \item \textbf{Avantages}:
+        \begin{itemize}
+            \item S'adapte à la \textbf{forme de la distribution}
+            \item Plus de choix pour les distributions plates
+            \item Moins de choix pour les distributions pointues
+            \item Meilleur équilibre qualité/diversité
+        \end{itemize}
+        \item \textbf{Inconvénients}:
+        \begin{itemize}
+            \item Peu prévisible (nombre de tokens variable)
+        \end{itemize}
+    \end{itemize}
+\end{frame}
+
+% Nouvelles slides sur le pré-entraînement et le fine-tuning
+\begin{frame}{Pré-entraînement vs Fine-tuning: Deux phases distinctes}
+    \begin{itemize}
+        \item \textbf{Pré-entraînement}:
+        \begin{itemize}
+            \item Entraînement sur des \textbf{données massives et générales}
+            \item Objectif: apprendre des \textbf{représentations générales} du langage
+            \item Tâche auto-supervisée: prédiction du token suivant
+            \item Nécessite d'énormes ressources de calcul
+            \item Réalisé une seule fois par les grands laboratoires
+        \end{itemize}
+        \vspace{0.3cm}
+        \item \textbf{Fine-tuning}:
+        \begin{itemize}
+            \item Adaptation à une \textbf{tâche spécifique}
+            \item Données \textbf{étiquetées} pour la tâche cible
+            \item Préserve les connaissances générales
+            \item Ressources de calcul plus modestes
+            \item Meilleure performance sur la tâche cible
+        \end{itemize}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Full Fine-tuning vs Partial Fine-tuning}
+    \begin{columns}
+        \begin{column}{0.65\textwidth}
+            \begin{center}
+                \includegraphics[width=\textwidth]{images/generated/full_vs_partial_finetuning.png}
+            \end{center}
+        \end{column}
+        \begin{column}{0.35\textwidth}
+            \begin{itemize}
+                \item \textbf{Full Fine-tuning}:
+                \begin{itemize}
+                    \item Mise à jour de \textbf{tous les paramètres} du modèle
+                    \item Performances optimales
+                    \item Nécessite beaucoup de \textbf{mémoire} et de \textbf{calcul}
+                    \item Risque d'\textbf{oubli catastrophique}
+                \end{itemize}
+                \vspace{0.3cm}
+                \item \textbf{Partial Fine-tuning}:
+                \begin{itemize}
+                    \item Seules certaines couches sont entraînées (souvent les dernières)
+                    \item Moins de paramètres à mettre à jour
+                    \item Économie de ressources
+                    \item Préserve mieux les connaissances générales
+                    \item Idéal pour des tâches similaires
+                \end{itemize}
+            \end{itemize}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{Méthodes avancées de Fine-tuning: Efficacité et performances}
+    \begin{itemize}
+        \item \textbf{Adapter}: Petits modules d'adaptation insérés entre les couches figées
+        \item \textbf{LoRA} (Low-Rank Adaptation): Matrices de rang faible en parallèle des poids principaux
+        \item \textbf{Prompt Tuning}: Ajout de tokens apprenables au contexte d'entrée
+        \item Avantages communs: économie de mémoire, transfert facilité, multitâche
     \end{itemize}
 \end{frame}
 
